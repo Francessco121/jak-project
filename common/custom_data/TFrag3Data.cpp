@@ -107,15 +107,73 @@ void TieTree::unpack() {
     }
   }
 
-  for (auto& draw : static_draws) {
-    draw.unpacked.idx_of_first_idx_in_full_buffer = unpacked.indices.size();
-    ASSERT(draw.plain_indices.empty());
-    for (auto& run : draw.runs) {
-      for (u32 ri = 0; ri < run.length; ri++) {
-        unpacked.indices.push_back(run.vertex0 + ri);
+  if (!FORCE_TIE_TRIANGLE_LISTS) {
+    for (auto& draw : static_draws) {
+      draw.unpacked.idx_of_first_idx_in_full_buffer = unpacked.indices.size();
+      ASSERT(draw.plain_indices.empty());
+
+      for (const auto& run : draw.runs) {
+        for (u32 ri = 0; ri < run.length; ri++) {
+          unpacked.indices.push_back(run.vertex0 + ri);
+        }
+
+        unpacked.indices.push_back(UINT32_MAX);
       }
-      unpacked.indices.push_back(UINT32_MAX);
     }
+  } else {
+    // Forcing triangle lists, convert strips to lists
+    use_strips = false;
+
+    for (auto& draw : static_draws) {
+      draw.unpacked.idx_of_first_idx_in_full_buffer = unpacked.indices.size();
+      ASSERT(draw.plain_indices.empty());
+
+      // Adjust vis group index counts as we go
+      int group_idx = 0;
+      StripDraw::VisGroup* current_group = &draw.vis_groups[group_idx];
+      int group_original_num_inds = current_group->num_inds;
+      int group_index_idx = 0;
+
+      for (const auto& run : draw.runs) {
+        ASSERT(group_index_idx <= group_original_num_inds);
+
+        if (group_index_idx == group_original_num_inds) {
+          // Next group
+          group_idx++;
+          current_group = &draw.vis_groups[group_idx];
+          group_original_num_inds = current_group->num_inds;
+          group_index_idx = 0;
+        }
+
+        for (u32 ri = 0; ri < run.length; ri++) {
+          unpacked.indices.push_back(run.vertex0 + ri);
+          group_index_idx++;
+
+          if (ri > 2) {
+            // Passed first 3 vertices, convert strip to list
+            unpacked.indices.push_back(run.vertex0 + ri - 2);
+            unpacked.indices.push_back(run.vertex0 + ri - 1);
+
+            current_group->num_inds += 2;
+          }
+        }
+
+        // Prim restart
+        group_index_idx++;
+        current_group->num_inds--;
+      }
+
+      ASSERT(group_idx == draw.vis_groups.size() - 1);
+    }
+  }
+
+  // Sanity check indices
+  for (u32 index : unpacked.indices) {
+    if (index == UINT32_MAX) {
+      continue;
+    }
+
+    ASSERT(index >= 0 && index < unpacked.vertices.size());
   }
 }
 

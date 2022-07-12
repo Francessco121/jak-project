@@ -63,6 +63,7 @@ class Tie3 : public BucketRenderer {
     const tfrag3::BVH* vis = nullptr;
     const u32* index_data = nullptr;
     SwizzledTimeOfDay tod_cache;
+    u64 draw_mode = 0;
 
     std::vector<std::array<math::Vector4f, 4>> wind_matrix_cache;
 

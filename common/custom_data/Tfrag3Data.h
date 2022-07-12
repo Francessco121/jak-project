@@ -54,6 +54,7 @@ enum MemoryUsageCategory {
 };
 
 constexpr int TFRAG3_VERSION = 20;
+constexpr bool FORCE_TIE_TRIANGLE_LISTS = false;
 
 // These vertices should be uploaded to the GPU at load time and don't change
 struct PreloadedVertex {
@@ -292,6 +293,7 @@ struct TieWindInstance {
 struct TieTree {
   BVH bvh;
   std::vector<StripDraw> static_draws;  // the actual topology and settings
+  bool use_strips = true;
 
   PackedTieVertices packed_vertices;
   std::vector<TimeOfDayColor> colors;  // vertex colors (pre-interpolation)

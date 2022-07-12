@@ -61,6 +61,7 @@ void Tie3::update_load(const LevelData* loader_data) {
       lod_tree[l_tree].wind_draws = &tree.instanced_wind_draws;
       vis_temp_len = std::max(vis_temp_len, tree.bvh.vis_nodes.size());
       lod_tree[l_tree].tod_cache = swizzle_time_of_day(tree.colors);
+      lod_tree[l_tree].draw_mode = tree.use_strips ? GL_TRIANGLE_STRIP : GL_TRIANGLES;
       glBindBuffer(GL_ARRAY_BUFFER, lod_tree[l_tree].vertex_buffer);
       glEnableVertexAttribArray(0);
       glEnableVertexAttribArray(1);
@@ -546,8 +547,13 @@ void Tie3::render_tree(int idx,
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                render_state->no_multidraw ? tree.single_draw_index_buffer : tree.index_buffer);
   glActiveTexture(GL_TEXTURE0);
-  glEnable(GL_PRIMITIVE_RESTART);
-  glPrimitiveRestartIndex(UINT32_MAX);
+  if (tree.draw_mode == GL_TRIANGLE_STRIP) {
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(UINT32_MAX);
+  } else {
+    glDisable(GL_PRIMITIVE_RESTART);
+  }
+  
   tree.perf.tod_time.add(setup_timer.getSeconds());
 
   int last_texture = -1;
@@ -627,10 +633,10 @@ void Tie3::render_tree(int idx,
     tree.perf.draws++;
 
     if (render_state->no_multidraw) {
-      glDrawElements(GL_TRIANGLE_STRIP, singledraw_indices.second, GL_UNSIGNED_INT,
+      glDrawElements(tree.draw_mode, singledraw_indices.second, GL_UNSIGNED_INT,
                      (void*)(singledraw_indices.first * sizeof(u32)));
     } else {
-      glMultiDrawElements(GL_TRIANGLE_STRIP,
+      glMultiDrawElements(tree.draw_mode,
                           &m_cache.multidraw_count_buffer[multidraw_indices.first], GL_UNSIGNED_INT,
                           &m_cache.multidraw_index_offset_buffer[multidraw_indices.first],
                           multidraw_indices.second);
@@ -648,11 +654,11 @@ void Tie3::render_tree(int idx,
                     double_draw.aref_second);
         glDepthMask(GL_FALSE);
         if (render_state->no_multidraw) {
-          glDrawElements(GL_TRIANGLE_STRIP, singledraw_indices.second, GL_UNSIGNED_INT,
+          glDrawElements(tree.draw_mode, singledraw_indices.second, GL_UNSIGNED_INT,
                          (void*)(singledraw_indices.first * sizeof(u32)));
         } else {
           glMultiDrawElements(
-              GL_TRIANGLE_STRIP, &m_cache.multidraw_count_buffer[multidraw_indices.first],
+              tree.draw_mode, &m_cache.multidraw_count_buffer[multidraw_indices.first],
               GL_UNSIGNED_INT, &m_cache.multidraw_index_offset_buffer[multidraw_indices.first],
               multidraw_indices.second);
         }
@@ -675,7 +681,7 @@ void Tie3::render_tree(int idx,
           settings.fog.x());
       glDisable(GL_BLEND);
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      glMultiDrawElements(GL_TRIANGLE_STRIP,
+      glMultiDrawElements(tree.draw_mode,
                           &m_cache.multidraw_count_buffer[multidraw_indices.first], GL_UNSIGNED_INT,
                           &m_cache.multidraw_index_offset_buffer[multidraw_indices.first],
                           multidraw_indices.second);
@@ -686,6 +692,9 @@ void Tie3::render_tree(int idx,
   }
 
   if (!m_hide_wind) {
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(UINT32_MAX);
+
     auto wind_prof = prof.make_scoped_child("wind");
     render_tree_wind(idx, geom, settings, render_state, wind_prof);
   }
