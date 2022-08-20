@@ -16,6 +16,7 @@
   ("transformq-h.o" "transformq-h")
   ("bounding-box.o" "bounding-box")
   ("matrix.o" "matrix")
+  ("matrix-pc.o" "matrix-pc") ;; added
   ("transform.o" "transform")
   ("quaternion.o" "quaternion")
   ("euler.o" "euler")
